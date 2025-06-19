@@ -9,7 +9,7 @@ st.set_page_config(page_title="Lichess Tournament Stats", layout="centered")
 st.title("♟️ Lichess Tournament Stats Viewer")
 
 # Hardcoded API key and performance settings
-TOKEN = 'lip_V6pSrcB7fVAgBYXqhorh'
+TOKEN = st.secrets["LICHESS_API_KEY"]
 INCLUDE_PERFORMANCE = True
 
 def fetch_tournaments():

@@ -1,1 +1,2 @@
 lichess-env/
+.streamlit/secrets.toml

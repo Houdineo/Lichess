@@ -3,6 +3,7 @@ import requests
 import json
 from collections import defaultdict
 import pandas as pd
+import altair as alt
 
 
 st.set_page_config(page_title="Lichess Tournament Stats", layout="centered")
@@ -148,13 +149,49 @@ if 'tournaments' in st.session_state:
     if points_time_data:
         df_points = pd.DataFrame(points_time_data, columns=["Date", "Points"]).sort_values("Date")
         df_points["Cumulative"] = df_points["Points"].cumsum()
-        st.markdown("### 📈 Points Over Time")
-        view_mode = st.radio("View Mode", ["Per Tournament", "Cumulative"])
-        if view_mode == "Cumulative":
-            st.line_chart(df_points.set_index("Date")["Cumulative"])
-        else:
-            st.line_chart(df_points.set_index("Date")["Points"])
 
+        today = pd.Timestamp.today().normalize()
+        start_of_year = pd.Timestamp(today.year, 1, 1)
+
+        st.markdown("### 📈 Points Over Time")
+        col1, col2 = st.columns(2)
+        with col1:
+            preset = st.selectbox("Date range:", [
+                "ALL", "1M", "3M", "6M", "YTD", "1Y"
+            ])
+        with col2:
+            view_mode = st.radio("View:", ["Per Tournament", "Cumulative"], horizontal = True)
+
+        if preset == "ALL":
+            df_filtered = df_points
+        elif preset == "1M":
+            df_filtered = df_points[df_points["Date"] >= today - pd.DateOffset(months=1)]
+        elif preset == "3M":
+            df_filtered = df_points[df_points["Date"] >= today - pd.DateOffset(months=3)]
+        elif preset == "6M":
+            df_filtered = df_points[df_points["Date"] >= today - pd.DateOffset(months=6)]
+        elif preset == "YTD":
+            df_filtered = df_points[df_points["Date"] >= start_of_year]
+        elif preset == "1Y":
+            df_filtered = df_points[df_points["Date"] >= today - pd.DateOffset(years=1)]
+        else:
+            df_filtered = df_points
+
+        if df_filtered.empty:
+            st.warning("No tournaments in selected date range.")
+        else:
+            y_column = "Cumulative" if view_mode == "Cumulative" else "Points"
+
+            chart = alt.Chart(df_filtered).mark_line().encode(
+                x=alt.X("Date:T", title="Date", axis=alt.Axis(format="%Y", labelAngle=0, tickCount="year")),
+                y=alt.Y(f"{y_column}:Q", title=y_column),
+                tooltip=["Date:T", f"{y_column}:Q"]
+            ).properties(
+                width=700,
+                height=400
+            ).interactive()
+
+            st.altair_chart(chart, use_container_width=True)
 
     st.markdown(f"### 🏆 Stats for {selected_name}")
 

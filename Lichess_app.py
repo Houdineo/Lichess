@@ -5,8 +5,6 @@ from collections import defaultdict
 import pandas as pd
 import altair as alt
 
-#test
-
 st.set_page_config(page_title="Lichess Tournament Stats", layout="centered")
 st.title("♟️ Lichess Tournament Stats Viewer")
 
@@ -137,63 +135,6 @@ if 'tournaments' in st.session_state:
         default=None
     )
 
-    # Prepare data for points over time chart (only for selected group)
-    points_time_data = []
-    for t in group:
-        timestamp = t.get("tournament", {}).get("startsAt")
-        score = t.get("player", {}).get("score", 0)
-        if timestamp:
-            dt = pd.to_datetime(timestamp, unit='ms')
-            points_time_data.append((dt, score))
-
-    # Only show chart if there's valid data
-    if points_time_data:
-        df_points = pd.DataFrame(points_time_data, columns=["Date", "Points"]).sort_values("Date")
-        df_points["Cumulative"] = df_points["Points"].cumsum()
-
-        today = pd.Timestamp.today().normalize()
-        start_of_year = pd.Timestamp(today.year, 1, 1)
-
-        st.markdown("### 📈 Points Over Time")
-        col1, col2 = st.columns(2)
-        with col1:
-            preset = st.selectbox("Date range:", [
-                "ALL", "1M", "3M", "6M", "YTD", "1Y"
-            ])
-        with col2:
-            view_mode = st.radio("View:", ["Per Tournament", "Cumulative"], horizontal = True)
-
-        if preset == "ALL":
-            df_filtered = df_points
-        elif preset == "1M":
-            df_filtered = df_points[df_points["Date"] >= today - pd.DateOffset(months=1)]
-        elif preset == "3M":
-            df_filtered = df_points[df_points["Date"] >= today - pd.DateOffset(months=3)]
-        elif preset == "6M":
-            df_filtered = df_points[df_points["Date"] >= today - pd.DateOffset(months=6)]
-        elif preset == "YTD":
-            df_filtered = df_points[df_points["Date"] >= start_of_year]
-        elif preset == "1Y":
-            df_filtered = df_points[df_points["Date"] >= today - pd.DateOffset(years=1)]
-        else:
-            df_filtered = df_points
-
-        if df_filtered.empty:
-            st.warning("No tournaments in selected date range.")
-        else:
-            y_column = "Cumulative" if view_mode == "Cumulative" else "Points"
-
-            chart = alt.Chart(df_filtered).mark_line().encode(
-                x=alt.X("Date:T", title="Date", axis=alt.Axis(format="%Y", labelAngle=0, tickCount="year")),
-                y=alt.Y(f"{y_column}:Q", title=y_column),
-                tooltip=["Date:T", f"{y_column}:Q"]
-            ).properties(
-                width=700,
-                height=400
-            ).interactive()
-
-            st.altair_chart(chart, use_container_width=True)
-
     st.markdown(f"### 🏆 Stats for {selected_name}")
 
     # Top row: Played, Max Points, Total Points
@@ -246,3 +187,78 @@ if 'tournaments' in st.session_state:
         f"<div style='text-align: center; color: #1E90FF;'>Top 🔟<br><span style='font-size: 24px'>{num_top10:,}</span></div>",
         unsafe_allow_html=True
     )
+
+    # Prepare data for points over time chart (only for selected group)
+    points_time_data = []
+    for t in group:
+        timestamp = t.get("tournament", {}).get("startsAt")
+        score = t.get("player", {}).get("score", 0)
+        if timestamp:
+            dt = pd.to_datetime(timestamp, unit='ms')
+            points_time_data.append((dt, score))
+
+    # Only show chart if there's valid data
+    if points_time_data:
+        df_points = pd.DataFrame(points_time_data, columns=["Date", "Points"]).sort_values("Date")
+        df_points["Cumulative"] = df_points["Points"].cumsum()
+
+        today = pd.Timestamp.today().normalize()
+        start_of_year = pd.Timestamp(today.year, 1, 1)
+
+        st.markdown("### 📈 Points Over Time")
+        col1, col2 = st.columns(2)
+        with col1:
+            preset = st.selectbox("Date range:", [
+                "ALL", "1M", "3M", "6M", "YTD", "1Y"
+            ])
+        with col2:
+            view_mode = st.radio("View:", ["Per Day", "Cumulative"], horizontal = True)
+
+        if preset == "ALL":
+            df_filtered = df_points
+        elif preset == "1M":
+            df_filtered = df_points[df_points["Date"] >= today - pd.DateOffset(months=1)]
+        elif preset == "3M":
+            df_filtered = df_points[df_points["Date"] >= today - pd.DateOffset(months=3)]
+        elif preset == "6M":
+            df_filtered = df_points[df_points["Date"] >= today - pd.DateOffset(months=6)]
+        elif preset == "YTD":
+            df_filtered = df_points[df_points["Date"] >= start_of_year]
+        elif preset == "1Y":
+            df_filtered = df_points[df_points["Date"] >= today - pd.DateOffset(years=1)]
+        else:
+            df_filtered = df_points
+
+        if df_filtered.empty:
+            st.warning("No tournaments in selected date range.")
+        else:
+            y_column = "Cumulative" if view_mode == "Cumulative" else "Points"
+
+            df_daily = df_filtered.copy()
+            df_daily["Day"] = df_daily["Date"].dt.date
+            df_grouped = df_daily.groupby("Day")[["Points"]].sum().reset_index()
+            df_grouped["Day"] = pd.to_datetime(df_grouped["Day"])
+
+            if view_mode == "Cumulative":
+                df_grouped["Cumulative"] = df_grouped["Points"].cumsum()
+
+            click = alt.selection_point(fields=["Day"], nearest=True)
+
+            line = alt.Chart(df_grouped).mark_line().encode(
+                x=alt.X("Day:T", title="Date", axis=alt.Axis(format="%b %Y", labelAngle=0)),
+                y=alt.Y(f"{y_column}:Q", title=y_column),
+            )
+
+            points = alt.Chart(df_grouped).mark_point(filled=True, size=30).encode(
+                x="Day:T",
+                y=f"{y_column}:Q",
+                tooltip=["Day:T", f"{y_column}:Q"],
+                opacity=alt.condition(click, alt.value(1), alt.value(0.2)),
+            ).add_params(click)
+
+            chart = (line + points).properties(
+                width=700,
+                height=400
+            )
+
+            st.altair_chart(chart, use_container_width=True)

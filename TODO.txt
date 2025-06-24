@@ -1,0 +1,26 @@
+
+TODO List for Lichess Tournament Analyzer
+
+Functionality Improvements
+
+- Cache tournament fetch responses to reduce API calls (@st.cache_data)
+- Handle API rate limiting (HTTP 429) with retry/backoff logic
+- Provide a user-friendly error message when rate limited
+
+Code Structure & Maintenance
+- Move tournament fetching logic into a separate utility module (utils.py)
+
+UI / UX
+- Show a loading spinner while tournaments are being fetched
+- Display number of tournaments fetched and time taken
+- word for word matching for the tournament names menu capitalization included
+- do a combined marathon setting too
+
+
+Future Ideas
+-show best tournaments for each tournament
+	- figure out how to calculate "best"
+	- maybe add a toggle for recent
+- Highlight most-played opponents
+- Let users compare multiple usernames side-by-side
+- Eventually split Streamlit app into multiple pages or sections.
